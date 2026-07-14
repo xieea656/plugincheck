@@ -8,7 +8,8 @@
 from __future__ import annotations
 
 import asyncio
-import multiprocessing
+import datetime
+import json as _json
 import os
 import shutil
 import subprocess
@@ -298,9 +299,50 @@ class Runner:
             except Exception:
                 pass
 
-        # 12. 清理
+        # 12. 写日志文件
+        log_path = self._write_log(r, data, err, journal_proc)
+
+        # 13. 清理
         r.info(f"LLM 调用: {data.get('llm_calls', 0)} 次 (Mock, 0 token)")
         r.info(f"Embedding 调用: {data.get('emb_calls', 0)} 次 (Mock)")
+        r.info(f"日志: {log_path}")
         shutil.rmtree(tmpdir, ignore_errors=True)
 
         return r
+
+    def _write_log(self, report: Report, data: dict, stderr: str, journal_proc) -> str:
+        """写入完整日志: 报告 + 原始 JSON + stderr + journal tail。"""
+        log_dir = Path(__file__).parent / "logs"
+        log_dir.mkdir(exist_ok=True)
+
+        ts = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        log_path = log_dir / f"{self.name}_{ts}.log"
+
+        sections = []
+        sections.append(f"# PluginCheck: {self.name}")
+        sections.append(f"# Time: {ts}")
+        sections.append(f"# Heavy: {self.heavy}  Count: {self.count}\n")
+
+        sections.append("## Report\n")
+        sections.append(report.format())
+
+        sections.append("\n## Raw Data\n")
+        sections.append(_json.dumps(data, indent=2, ensure_ascii=False, default=str))
+
+        if stderr.strip():
+            sections.append("\n## stderr\n")
+            sections.append(stderr.strip())
+
+        if journal_proc:
+            try:
+                jout, _ = journal_proc.communicate(timeout=2)
+                if jout.strip():
+                    sections.append("\n## journalctl\n")
+                    sections.append(jout.strip())
+            except Exception:
+                sections.append("\n## journalctl\n(读取超时)\n")
+
+        with open(log_path, "w", encoding="utf-8") as f:
+            f.write("\n".join(sections))
+
+        return str(log_path)

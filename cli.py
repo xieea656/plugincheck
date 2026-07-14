@@ -18,6 +18,7 @@
 from __future__ import annotations
 
 import argparse
+import datetime
 import sys
 from pathlib import Path
 
@@ -25,6 +26,7 @@ from checker import Checker
 from runner import Runner
 
 PLUGINS_DIR = Path("data/plugins")
+LOG_DIR = Path(__file__).parent / "logs"
 
 
 def cmd_check(args):
@@ -53,6 +55,22 @@ def cmd_test(args):
     print(report.format())
 
 
+def cmd_logs(args):
+    """列出历史日志。"""
+    if not LOG_DIR.is_dir():
+        print("(暂无日志)")
+        return
+    files = sorted(LOG_DIR.glob("*.log"), key=lambda p: p.stat().st_mtime, reverse=True)
+    if not files:
+        print("(暂无日志)")
+        return
+    n = args.n
+    for f in files[:n]:
+        size = f.stat().st_size
+        mtime = datetime.datetime.fromtimestamp(f.stat().st_mtime).strftime("%m-%d %H:%M")
+        print(f"  {mtime}  {size:>6}B  {f.name}")
+
+
 def main():
     p = argparse.ArgumentParser(description="PluginCheck — AstrBot 插件测试工具")
     sub = p.add_subparsers(dest="cmd")
@@ -66,11 +84,16 @@ def main():
     t.add_argument("--count", type=int, default=200, help="压力消息数 (默认 200)")
     t.add_argument("--journal", action="store_true", help="附 systemd 日志监控")
 
+    l = sub.add_parser("logs", help="查看历史日志")
+    l.add_argument("-n", type=int, default=10, help="显示最近 N 条 (默认 10)")
+
     args = p.parse_args()
     if args.cmd == "check":
         cmd_check(args)
     elif args.cmd == "test":
         cmd_test(args)
+    elif args.cmd == "logs":
+        cmd_logs(args)
     else:
         p.print_help()
 
