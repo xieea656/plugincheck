@@ -19,13 +19,14 @@ from __future__ import annotations
 
 import argparse
 import datetime
+import os
 import sys
 from pathlib import Path
 
 from checker import Checker
 from runner import Runner
 
-PLUGINS_DIR = Path("data/plugins")
+PLUGINS_DIR = Path(os.environ.get("PLUGINS_DIR", "data/plugins"))
 LOG_DIR = Path(__file__).parent / "logs"
 
 

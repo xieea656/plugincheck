@@ -4,23 +4,63 @@ AstrBot 插件自动化测试 CLI —— 静态分析 + 子进程压力测试 + 
 
 **不用装插件、不用重启 AstrBot、不用手动清数据。**
 
+## 前置条件
+
+- 运行在 **AstrBot 所在的机器上**（通常是 Fedora 服务器），因为需要 AstrBot 的 Python 环境来 import 插件
+- Python 3.10+
+
+## 如何找到插件
+
+PluginCheck 从 **AstrBot 标准插件目录**读取插件。默认路径 `data/plugins/` 相对于**当前工作目录**：
+
+```
+当前目录 (通常是 ~/astrbot/)
+└── data/
+    └── plugins/
+        └── your_plugin/        # ← 传入这个目录名
+            ├── main.py
+            ├── metadata.yaml
+            └── ...
+```
+
+所以你需要**在 AstrBot 根目录下运行** PluginCheck，或者把 PluginCheck 放在 AstrBot 根目录里：
+
+```bash
+cd ~/astrbot
+python3 ../plugincheck/cli.py test your_plugin
+
+# 或者拷进去
+cp -r ~/plugincheck ~/astrbot/plugincheck
+cd ~/astrbot
+python3 plugincheck/cli.py test your_plugin
+```
+
+如果插件目录不在默认位置，用环境变量覆盖：
+
+```bash
+PLUGINS_DIR=/home/me/my_plugins python3 cli.py test your_plugin
+```
+
 ## 快速开始
 
 ```bash
 git clone https://github.com/xieea656/plugincheck
 cd plugincheck
 
+# 放到 AstrBot 同机的 data/plugins/ 同级
+# plugincheck 会自动找 ../data/plugins/<name>/
+
 # 静态分析
-python3 cli.py check astrbot_plugin_echoer
+python3 cli.py check your_plugin
 
 # 全量测试
-python3 cli.py test astrbot_plugin_echoer
+python3 cli.py test your_plugin
 
 # 压力测试
-python3 cli.py test astrbot_plugin_echoer --heavy --count 500
+python3 cli.py test your_plugin --heavy --count 500
 
-# 带 systemd 日志监控
-python3 cli.py test astrbot_plugin_echoer --heavy --journal
+# 带 systemd 日志监控（捕获 AstrBot 运行时异常）
+python3 cli.py test your_plugin --heavy --journal
 ```
 
 ## 命令
@@ -59,7 +99,7 @@ python3 cli.py test astrbot_plugin_echoer --heavy --journal
 
 ## 日志
 
-每次 `test` 自动导出日志到 `logs/<plugin>_<timestamp>.log`：
+每次 `test` 自动导出日志到 `logs/<name>_<timestamp>.log`：
 
 ```markdown
 ## Report
@@ -83,13 +123,13 @@ python3 cli.py logs -n 20  # 最近 20 条
 ## 原理
 
 ```
-python3 cli.py test echoer --heavy
+python3 cli.py test your_plugin --heavy
         │
         ├─ checker.py    → 静态分析（主进程, 直接 import + ast.parse）
         │
         └─ runner.py     → spawn 子进程
               │
-              ├─ import 目标插件
+              ├─ import 目标插件（从 data/plugins/<name>/main.py）
               ├─ Mock LLM / Embedding 注入
               ├─ 发现 handler（command / event / llm_hook / regex）
               ├─ 逐个触发 + try/except 捕获
@@ -97,19 +137,15 @@ python3 cli.py test echoer --heavy
               ├─ 返回 JSON 结果 + stderr
               │
          ← 主进程收集 → 写报告 + 日志文件
-         ← 清理临时目录
+         ← 清理临时目录, 测试数据无残留
 ```
 
 子进程隔离：插件 `__init__` 崩溃、`initialize` 死循环、handler panic —— 都不影响测试器本身。
 
-## 放在哪
-
-运行在 **Fedora 服务器**上（AstrBot 同机），因为需要 AstrBot 的 Python 环境来 import 插件。
-
-从 Windows 远程触发：
+## 从 Windows 远程触发
 
 ```bash
-ssh fedora "cd ~/plugincheck && python3 cli.py test echoer --heavy"
+ssh fedora "cd ~/plugincheck && python3 cli.py test your_plugin --heavy"
 ```
 
 ## License
