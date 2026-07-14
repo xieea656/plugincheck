@@ -6,8 +6,9 @@ AstrBot 插件自动化测试 CLI —— 静态分析 + 子进程压力测试 + 
 
 ## 前置条件
 
-- 运行在 **AstrBot 所在的机器上**（通常是 Fedora 服务器），因为需要 AstrBot 的 Python 环境来 import 插件
+- 运行在 **AstrBot 所在的机器上**（需要 AstrBot 的 Python 环境来 import 插件）
 - Python 3.10+
+- 如果使用 `--journal`：需要 `journalctl` 可用（Linux + systemd）
 
 ## 如何找到插件
 
@@ -47,20 +48,11 @@ PLUGINS_DIR=/home/me/my_plugins python3 cli.py test your_plugin
 git clone https://github.com/xieea656/plugincheck
 cd plugincheck
 
-# 放到 AstrBot 同机的 data/plugins/ 同级
-# plugincheck 会自动找 ../data/plugins/<name>/
+# 在 AstrBot 根目录下运行（或设置 PLUGINS_DIR 指向插件目录）
 
-# 静态分析
-python3 cli.py check your_plugin
-
-# 全量测试
-python3 cli.py test your_plugin
-
-# 压力测试
-python3 cli.py test your_plugin --heavy --count 500
-
-# 带 systemd 日志监控（捕获 AstrBot 运行时异常）
-python3 cli.py test your_plugin --heavy --journal
+python3 cli.py check your_plugin         # 静态分析
+python3 cli.py test your_plugin          # 全量测试
+python3 cli.py test your_plugin --heavy  # 压力测试
 ```
 
 ## 命令
@@ -141,12 +133,6 @@ python3 cli.py test your_plugin --heavy
 ```
 
 子进程隔离：插件 `__init__` 崩溃、`initialize` 死循环、handler panic —— 都不影响测试器本身。
-
-## 从 Windows 远程触发
-
-```bash
-ssh fedora "cd ~/plugincheck && python3 cli.py test your_plugin --heavy"
-```
 
 ## License
 
